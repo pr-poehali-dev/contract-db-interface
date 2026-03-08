@@ -126,9 +126,39 @@ export default function Index() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [contracts, setContracts] = useState(MOCK_CONTRACTS);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<typeof MOCK_CONTRACTS[0] | null>(null);
 
   const handleFormChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const openDetail = (contract: typeof MOCK_CONTRACTS[0]) => {
+    setSelectedContract(contract);
+    setEditMode(false);
+    setEditForm({ ...contract });
+  };
+
+  const closeDetail = () => {
+    setSelectedContract(null);
+    setEditMode(false);
+    setEditForm(null);
+  };
+
+  const handleEditChange = (field: string, value: string) => {
+    setEditForm((prev) => prev ? { ...prev, [field]: value } : prev);
+  };
+
+  const handleSave = () => {
+    if (!editForm) return;
+    setContracts((prev) => prev.map((c) => c.id === editForm.id ? editForm : c));
+    setSelectedContract(editForm);
+    setEditMode(false);
+  };
+
+  const handleDelete = (id: string) => {
+    setContracts((prev) => prev.filter((c) => c.id !== id));
+    closeDetail();
   };
 
   const handleSubmit = () => {
@@ -283,7 +313,7 @@ export default function Index() {
             filtered.map((contract, i) => (
               <div
                 key={contract.id}
-                onClick={() => setSelectedContract(contract)}
+                onClick={() => openDetail(contract)}
                 className="glass rounded-xl p-5 contract-card cursor-pointer animate-slide-up"
                 style={{ animationDelay: `${i * 0.05}s` }}
               >
@@ -479,81 +509,208 @@ export default function Index() {
       )}
 
       {/* Detail Panel */}
-      {selectedContract && (
+      {selectedContract && editForm && (
         <div
           className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 animate-fade-in"
-          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-          onClick={() => setSelectedContract(null)}
+          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+          onClick={closeDetail}
         >
           <div
-            className="glass rounded-2xl w-full max-w-lg p-6 animate-scale-in"
+            className="bg-card rounded-2xl w-full max-w-lg shadow-2xl animate-scale-in border border-border flex flex-col"
+            style={{ maxHeight: "90vh" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <p className="font-mono text-xs text-muted-foreground mb-1">{selectedContract.id}</p>
-                <h2 className="font-bold text-lg leading-tight">{selectedContract.title}</h2>
-              </div>
-              <button
-                onClick={() => setSelectedContract(null)}
-                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground"
-              >
-                <Icon name="X" size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-2 mb-6">
-              {[
-                { label: "Контрагент", value: selectedContract.counterparty, icon: "Building2" },
-                { label: "Тип договора", value: selectedContract.type, icon: "Tag" },
-                { label: "Срок действия", value: `${selectedContract.startDate} — ${selectedContract.endDate}`, icon: "Calendar" },
-                { label: "Сумма договора", value: selectedContract.amount, icon: "DollarSign" },
-                { label: "Статус", value: STATUS_LABELS[selectedContract.status], icon: "Activity" },
-              ].map((row) => (
-                <div key={row.label} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3">
-                  <Icon name={row.icon} size={15} className="text-muted-foreground flex-shrink-0" />
-                  <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{row.label}</span>
-                  <span className="text-sm font-medium flex-1">{row.value}</span>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${editMode ? "bg-amber-100" : "bg-primary/10"}`}>
+                  <Icon name={editMode ? "Pencil" : "FileText"} size={15} className={editMode ? "text-amber-600" : "text-primary"} />
                 </div>
-              ))}
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-muted-foreground">{selectedContract.id}</p>
+                  <h2 className="font-bold text-sm leading-tight truncate">
+                    {editMode ? "Редактирование договора" : selectedContract.title}
+                  </h2>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0 ml-3">
+                {!editMode && (
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="h-8 px-3 rounded-lg hover:bg-muted flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-xs font-medium"
+                  >
+                    <Icon name="Pencil" size={13} />
+                    Изменить
+                  </button>
+                )}
+                <button
+                  onClick={closeDetail}
+                  className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
+                >
+                  <Icon name="X" size={16} />
+                </button>
+              </div>
             </div>
 
-            <div className="mb-6">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Icon name="Paperclip" size={12} />
-                Файлы договора
-              </p>
-              {selectedContract.files > 0 ? (
-                <div className="space-y-2">
-                  {Array.from({ length: selectedContract.files }, (_, idx) => (
-                    <div key={idx} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-2.5 group hover:bg-muted/50 transition-colors cursor-pointer">
-                      <Icon name="FileText" size={14} className="text-primary" />
-                      <span className="text-sm flex-1">Документ_{idx + 1}.pdf</span>
-                      <Icon name="Download" size={13} className="text-muted-foreground group-hover:text-primary transition-colors" />
+            {/* Body */}
+            <div className="px-6 py-5 space-y-3 overflow-y-auto flex-1">
+              {editMode ? (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Название договора</label>
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={(e) => handleEditChange("title", e.target.value)}
+                      className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Контрагент</label>
+                    <input
+                      type="text"
+                      value={editForm.counterparty}
+                      onChange={(e) => handleEditChange("counterparty", e.target.value)}
+                      className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Тип договора</label>
+                      <select
+                        value={editForm.type}
+                        onChange={(e) => handleEditChange("type", e.target.value)}
+                        className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all text-foreground"
+                      >
+                        {CONTRACT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Статус</label>
+                      <select
+                        value={editForm.status}
+                        onChange={(e) => handleEditChange("status", e.target.value)}
+                        className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all text-foreground"
+                      >
+                        {CONTRACT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Дата начала</label>
+                      <input
+                        type="text"
+                        placeholder="дд.мм.гггг"
+                        value={editForm.startDate === "—" ? "" : editForm.startDate}
+                        onChange={(e) => handleEditChange("startDate", e.target.value || "—")}
+                        className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Дата окончания</label>
+                      <input
+                        type="text"
+                        placeholder="дд.мм.гггг"
+                        value={editForm.endDate === "—" ? "" : editForm.endDate}
+                        onChange={(e) => handleEditChange("endDate", e.target.value || "—")}
+                        className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Сумма договора</label>
+                    <input
+                      type="text"
+                      value={editForm.amount}
+                      onChange={(e) => handleEditChange("amount", e.target.value)}
+                      className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {[
+                    { label: "Контрагент", value: selectedContract.counterparty, icon: "Building2" },
+                    { label: "Тип договора", value: selectedContract.type, icon: "Tag" },
+                    { label: "Период", value: `${selectedContract.startDate} — ${selectedContract.endDate}`, icon: "Calendar" },
+                    { label: "Сумма", value: selectedContract.amount, icon: "DollarSign" },
+                    { label: "Статус", value: STATUS_LABELS[selectedContract.status], icon: "Activity" },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3">
+                      <Icon name={row.icon} size={15} className="text-muted-foreground flex-shrink-0" />
+                      <span className="text-xs text-muted-foreground w-24 flex-shrink-0">{row.label}</span>
+                      <span className="text-sm font-medium flex-1">{row.value}</span>
                     </div>
                   ))}
-                </div>
-              ) : (
-                <div className="border border-dashed border-border rounded-lg p-6 text-center">
-                  <Icon name="Upload" size={20} className="text-muted-foreground mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">Перетащите файлы или нажмите для загрузки</p>
-                  <p className="text-xs text-muted-foreground mt-1">PDF, Word, изображения</p>
-                </div>
+
+                  {/* Files */}
+                  <div className="pt-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <Icon name="Paperclip" size={12} />
+                      Файлы договора
+                    </p>
+                    {selectedContract.files > 0 ? (
+                      <div className="space-y-1.5">
+                        {Array.from({ length: selectedContract.files }, (_, idx) => (
+                          <div key={idx} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-2.5 group hover:bg-muted/50 transition-colors cursor-pointer">
+                            <Icon name="FileText" size={14} className="text-primary" />
+                            <span className="text-sm flex-1">Документ_{idx + 1}.pdf</span>
+                            <Icon name="Download" size={13} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="border border-dashed border-border rounded-lg p-5 text-center">
+                        <Icon name="Upload" size={18} className="text-muted-foreground mx-auto mb-1.5" />
+                        <p className="text-xs text-muted-foreground">Файлы не прикреплены</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="flex gap-2">
-              <button className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
-                <Icon name="Pencil" size={14} />
-                Редактировать
-              </button>
-              <button className="glass px-4 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
-                <Icon name="Upload" size={14} />
-                Загрузить файл
-              </button>
-              <button className="glass px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:text-destructive transition-colors">
-                <Icon name="Trash2" size={14} />
-              </button>
+            {/* Footer */}
+            <div className="px-6 pb-6 pt-4 border-t border-border flex gap-2 flex-shrink-0">
+              {editMode ? (
+                <>
+                  <button
+                    onClick={handleSave}
+                    disabled={!editForm.title || !editForm.counterparty}
+                    className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <Icon name="Check" size={14} />
+                    Сохранить изменения
+                  </button>
+                  <button
+                    onClick={() => { setEditMode(false); setEditForm({ ...selectedContract }); }}
+                    className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground border border-border hover:bg-muted transition-colors"
+                  >
+                    Отмена
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Icon name="Pencil" size={14} />
+                    Редактировать
+                  </button>
+                  <button className="px-4 py-2.5 rounded-lg text-sm text-muted-foreground border border-border hover:bg-muted transition-colors flex items-center gap-2">
+                    <Icon name="Upload" size={14} />
+                    Загрузить файл
+                  </button>
+                  <button
+                    onClick={() => handleDelete(selectedContract.id)}
+                    className="px-3 py-2.5 rounded-lg text-sm text-muted-foreground border border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
+                  >
+                    <Icon name="Trash2" size={14} />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
