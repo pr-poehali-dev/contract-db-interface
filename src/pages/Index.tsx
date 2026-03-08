@@ -143,6 +143,28 @@ export default function Index() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFields, setExportFields] = useState<string[]>(EXPORT_FIELDS.map((f) => f.key));
   const [exportFormat, setExportFormat] = useState<"csv" | "tsv">("csv");
+  const [counterpartySuggestions, setCounterpartySuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const uniqueCounterparties = Array.from(new Set(contracts.map((c) => c.counterparty)));
+
+  const handleCounterpartyChange = (value: string) => {
+    handleFormChange("counterparty", value);
+    if (value.trim().length > 0) {
+      const matches = uniqueCounterparties.filter((cp) =>
+        cp.toLowerCase().includes(value.toLowerCase())
+      );
+      setCounterpartySuggestions(matches);
+      setShowSuggestions(matches.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectCounterparty = (name: string) => {
+    handleFormChange("counterparty", name);
+    setShowSuggestions(false);
+  };
 
   const toggleExportField = (key: string) => {
     setExportFields((prev) =>
@@ -462,17 +484,65 @@ export default function Index() {
               </div>
 
               {/* Контрагент */}
-              <div>
+              <div className="relative">
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   Контрагент <span className="text-destructive">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Название организации или ИП"
-                  value={form.counterparty}
-                  onChange={(e) => handleFormChange("counterparty", e.target.value)}
-                  className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Название организации или ИП"
+                    value={form.counterparty}
+                    onChange={(e) => handleCounterpartyChange(e.target.value)}
+                    onFocus={() => {
+                      if (form.counterparty.trim().length > 0 && counterpartySuggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                    className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 pr-8 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground"
+                  />
+                  {form.counterparty && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => { handleFormChange("counterparty", ""); setShowSuggestions(false); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <Icon name="X" size={13} />
+                    </button>
+                  )}
+                </div>
+                {showSuggestions && (
+                  <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden animate-scale-in">
+                    <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+                      <Icon name="History" size={12} className="text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Контрагенты из базы</span>
+                    </div>
+                    {counterpartySuggestions.map((name) => {
+                      const count = contracts.filter((c) => c.counterparty === name).length;
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectCounterparty(name)}
+                          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/60 transition-colors text-left group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Icon name="Building2" size={12} className="text-primary" />
+                            </div>
+                            <span className="text-sm text-foreground truncate">{name}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground ml-3 flex-shrink-0">
+                            {count} {count === 1 ? "договор" : count < 5 ? "договора" : "договоров"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Тип и Статус */}
