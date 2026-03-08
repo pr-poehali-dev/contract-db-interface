@@ -101,14 +101,55 @@ const STATS = [
 
 const ALL_STATUSES = ["Все", "Активный", "Истёк", "На согласовании", "Черновик"];
 const ALL_TYPES = ["Все типы", "Поставка", "Аренда", "Услуги", "Обслуживание", "Страхование"];
+const CONTRACT_TYPES = ["Поставка", "Аренда", "Услуги", "Обслуживание", "Страхование"];
+const CONTRACT_STATUSES = [
+  { value: "active", label: "Активный" },
+  { value: "pending", label: "На согласовании" },
+  { value: "draft", label: "Черновик" },
+];
+
+const EMPTY_FORM = {
+  title: "",
+  counterparty: "",
+  type: "Услуги",
+  status: "draft",
+  startDate: "",
+  endDate: "",
+  amount: "",
+};
 
 export default function Index() {
   const [search, setSearch] = useState("");
   const [activeStatus, setActiveStatus] = useState("Все");
   const [activeType, setActiveType] = useState("Все типы");
   const [selectedContract, setSelectedContract] = useState<typeof MOCK_CONTRACTS[0] | null>(null);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [contracts, setContracts] = useState(MOCK_CONTRACTS);
 
-  const filtered = MOCK_CONTRACTS.filter((c) => {
+  const handleFormChange = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = () => {
+    if (!form.title || !form.counterparty) return;
+    const newContract = {
+      id: `ДГ-${new Date().getFullYear()}-${String(contracts.length + 1).padStart(3, "0")}`,
+      title: form.title,
+      counterparty: form.counterparty,
+      type: form.type,
+      status: form.status,
+      startDate: form.startDate || "—",
+      endDate: form.endDate || "—",
+      amount: form.amount ? `${form.amount} ₽` : "—",
+      files: 0,
+    };
+    setContracts((prev) => [newContract, ...prev]);
+    setForm(EMPTY_FORM);
+    setShowNewModal(false);
+  };
+
+  const filtered = contracts.filter((c) => {
     const matchSearch =
       c.title.toLowerCase().includes(search.toLowerCase()) ||
       c.counterparty.toLowerCase().includes(search.toLowerCase()) ||
@@ -134,7 +175,10 @@ export default function Index() {
             <Icon name="Bell" size={15} />
             <span className="bg-primary text-primary-foreground text-xs rounded-full px-1.5 py-0.5 font-mono">1</span>
           </button>
-          <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2">
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
+          >
             <Icon name="Plus" size={15} />
             Новый договор
           </button>
@@ -289,6 +333,150 @@ export default function Index() {
           )}
         </div>
       </main>
+
+      {/* New Contract Modal */}
+      {showNewModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 animate-fade-in"
+          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowNewModal(false)}
+        >
+          <div
+            className="bg-card rounded-2xl w-full max-w-lg shadow-2xl animate-scale-in border border-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon name="FilePlus" size={16} className="text-primary" />
+                </div>
+                <h2 className="font-bold text-base">Новый договор</h2>
+              </div>
+              <button
+                onClick={() => setShowNewModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
+              >
+                <Icon name="X" size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              {/* Название */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                  Название договора <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Например: Поставка офисной мебели"
+                  value={form.title}
+                  onChange={(e) => handleFormChange("title", e.target.value)}
+                  className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground"
+                />
+              </div>
+
+              {/* Контрагент */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                  Контрагент <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Название организации или ИП"
+                  value={form.counterparty}
+                  onChange={(e) => handleFormChange("counterparty", e.target.value)}
+                  className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground"
+                />
+              </div>
+
+              {/* Тип и Статус */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Тип договора</label>
+                  <select
+                    value={form.type}
+                    onChange={(e) => handleFormChange("type", e.target.value)}
+                    className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all text-foreground"
+                  >
+                    {CONTRACT_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Статус</label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => handleFormChange("status", e.target.value)}
+                    className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all text-foreground"
+                  >
+                    {CONTRACT_STATUSES.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Даты */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Дата начала</label>
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => handleFormChange("startDate", e.target.value)}
+                    className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Дата окончания</label>
+                  <input
+                    type="date"
+                    value={form.endDate}
+                    onChange={(e) => handleFormChange("endDate", e.target.value)}
+                    className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all text-foreground"
+                  />
+                </div>
+              </div>
+
+              {/* Сумма */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Сумма договора, ₽</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={form.amount}
+                    onChange={(e) => handleFormChange("amount", e.target.value)}
+                    className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2.5 pr-8 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-all placeholder:text-muted-foreground"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₽</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 pb-6 pt-4 border-t border-border flex gap-2">
+              <button
+                onClick={handleSubmit}
+                disabled={!form.title || !form.counterparty}
+                className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Icon name="Check" size={15} />
+                Создать договор
+              </button>
+              <button
+                onClick={() => setShowNewModal(false)}
+                className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground border border-border hover:bg-muted transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail Panel */}
       {selectedContract && (
