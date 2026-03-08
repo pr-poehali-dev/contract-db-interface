@@ -101,6 +101,18 @@ const STATS = [
 
 const ALL_STATUSES = ["Все", "Активный", "Истёк", "На согласовании", "Черновик"];
 const ALL_TYPES = ["Все типы", "Поставка", "Аренда", "Услуги", "Обслуживание", "Страхование"];
+
+const EXPORT_FIELDS = [
+  { key: "id", label: "Номер договора" },
+  { key: "title", label: "Название" },
+  { key: "counterparty", label: "Контрагент" },
+  { key: "type", label: "Тип" },
+  { key: "status", label: "Статус" },
+  { key: "startDate", label: "Дата начала" },
+  { key: "endDate", label: "Дата окончания" },
+  { key: "amount", label: "Сумма" },
+  { key: "files", label: "Кол-во файлов" },
+];
 const CONTRACT_TYPES = ["Поставка", "Аренда", "Услуги", "Обслуживание", "Страхование"];
 const CONTRACT_STATUSES = [
   { value: "active", label: "Активный" },
@@ -128,6 +140,39 @@ export default function Index() {
   const [contracts, setContracts] = useState(MOCK_CONTRACTS);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState<typeof MOCK_CONTRACTS[0] | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFields, setExportFields] = useState<string[]>(EXPORT_FIELDS.map((f) => f.key));
+  const [exportFormat, setExportFormat] = useState<"csv" | "tsv">("csv");
+
+  const toggleExportField = (key: string) => {
+    setExportFields((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  const handleExport = () => {
+    const orderedFields = EXPORT_FIELDS.filter((f) => exportFields.includes(f.key));
+    const sep = exportFormat === "csv" ? ";" : "\t";
+    const header = orderedFields.map((f) => f.label).join(sep);
+    const rows = filtered.map((c) =>
+      orderedFields.map((f) => {
+        const val = c[f.key as keyof typeof c];
+        if (f.key === "status") return STATUS_LABELS[c.status] ?? val;
+        const str = String(val ?? "");
+        return exportFormat === "csv" ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(sep)
+    );
+    const content = [header, ...rows].join("\n");
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `реестр_договоров_${new Date().toLocaleDateString("ru-RU").replace(/\./g, "-")}.${exportFormat}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportModal(false);
+  };
 
   const handleFormChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -290,9 +335,18 @@ export default function Index() {
           <p className="text-sm text-muted-foreground">
             Найдено: <span className="text-foreground font-medium">{filtered.length}</span> договоров
           </p>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Icon name="ArrowUpDown" size={12} />
-            По дате обновления
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary border border-border hover:border-primary/40 px-3 py-1.5 rounded-lg transition-all bg-card"
+            >
+              <Icon name="Download" size={13} />
+              Выгрузить реестр
+            </button>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Icon name="ArrowUpDown" size={12} />
+              По дате обновления
+            </div>
           </div>
         </div>
 
@@ -499,6 +553,137 @@ export default function Index() {
               </button>
               <button
                 onClick={() => setShowNewModal(false)}
+                className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground border border-border hover:bg-muted transition-colors"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 animate-fade-in"
+          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowExportModal(false)}
+        >
+          <div
+            className="bg-card rounded-2xl w-full max-w-md shadow-2xl animate-scale-in border border-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon name="FileDown" size={15} className="text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-sm">Выгрузка реестра</h2>
+                  <p className="text-xs text-muted-foreground">{filtered.length} договоров по текущим фильтрам</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
+              >
+                <Icon name="X" size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5">
+              {/* Format */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Формат файла</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["csv", "tsv"] as const).map((fmt) => (
+                    <button
+                      key={fmt}
+                      onClick={() => setExportFormat(fmt)}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                        exportFormat === fmt
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      }`}
+                    >
+                      <Icon name="FileText" size={14} />
+                      {fmt === "csv" ? "CSV (Excel)" : "TSV (таблицы)"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {exportFormat === "csv" ? "Разделитель — точка с запятой, кодировка UTF-8" : "Разделитель — табуляция"}
+                </p>
+              </div>
+
+              {/* Fields */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Поля для выгрузки</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setExportFields(EXPORT_FIELDS.map((f) => f.key))}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Все
+                    </button>
+                    <span className="text-muted-foreground text-xs">/</span>
+                    <button
+                      onClick={() => setExportFields([])}
+                      className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      Сбросить
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {EXPORT_FIELDS.map((field) => {
+                    const checked = exportFields.includes(field.key);
+                    return (
+                      <label
+                        key={field.key}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                          checked ? "bg-primary/5 border border-primary/20" : "border border-transparent hover:bg-muted/50"
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                            checked ? "bg-primary border-primary" : "border-2 border-border bg-transparent"
+                          }`}
+                          style={{ border: checked ? "none" : undefined }}
+                        >
+                          {checked && <Icon name="Check" size={11} className="text-white" />}
+                        </div>
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={checked}
+                          onChange={() => toggleExportField(field.key)}
+                        />
+                        <span className={`text-sm ${checked ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                          {field.label}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 pt-4 border-t border-border flex gap-2">
+              <button
+                onClick={handleExport}
+                disabled={exportFields.length === 0}
+                className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Icon name="Download" size={14} />
+                Скачать файл
+              </button>
+              <button
+                onClick={() => setShowExportModal(false)}
                 className="px-5 py-2.5 rounded-lg text-sm text-muted-foreground border border-border hover:bg-muted transition-colors"
               >
                 Отмена
